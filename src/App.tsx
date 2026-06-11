@@ -9,6 +9,8 @@ import DiagnosisPage from './pages/DiagnosisPage';
 import CommunicationPage from './pages/CommunicationPage';
 import DisposalPage from './pages/DisposalPage';
 import StatisticsPage from './pages/StatisticsPage';
+import ReviewCalendarPage from './pages/ReviewCalendarPage';
+import SummaryPage from './pages/SummaryPage';
 
 export default function App() {
   return (
@@ -24,6 +26,8 @@ export default function App() {
           <Route path="/merchants/:id/communication" element={<CommunicationPage />} />
           <Route path="/merchants/:id/disposal" element={<DisposalPage />} />
           <Route path="/statistics" element={<StatisticsPage />} />
+          <Route path="/review-calendar" element={<ReviewCalendarPage />} />
+          <Route path="/summary" element={<SummaryPage />} />
           <Route path="/" element={<TasksPage />} />
         </Routes>
       </Layout>

@@ -24,17 +24,23 @@ export default function MerchantDetailPage() {
     const verifications = storage.getVerificationsByMerchantId(merchantId);
     const communications = storage.getCommunicationsByMerchantId(merchantId);
     const disposals = storage.getDisposalsByMerchantId(merchantId);
-    const tasks = storage.getTasks().filter((t) => t.merchantId === merchantId);
+    const taskStatusChanges = storage.getTaskStatusChangesByMerchantId(merchantId);
 
     const items: TimelineItem[] = [];
 
-    tasks.forEach((task) => {
+    const statusLabels: Record<string, string> = {
+      pending: '待处理',
+      in_progress: '处理中',
+      completed: '已完成',
+    };
+
+    taskStatusChanges.forEach((change) => {
       items.push({
-        id: `task-${task.id}`,
+        id: `task-change-${change.id}`,
         type: 'task',
         title: `任务状态变更`,
-        description: `状态: ${task.status === 'pending' ? '待处理' : task.status === 'in_progress' ? '处理中' : '已完成'}`,
-        time: task.createdAt,
+        description: `${statusLabels[change.oldStatus] || change.oldStatus} → ${statusLabels[change.newStatus] || change.newStatus} (${change.source === 'route_plan' ? '拜访路线' : change.source === 'task_detail' ? '任务详情' : '系统'})`,
+        time: change.changedAt,
         icon: 'task',
       });
     });

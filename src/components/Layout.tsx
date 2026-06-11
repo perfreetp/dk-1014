@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, Building2, FileText, BarChart3, MessageSquare, Settings, Menu, X, ChevronLeft } from 'lucide-react';
+import { ClipboardList, Building2, FileText, BarChart3, MessageSquare, Settings, Menu, X, ChevronLeft, Calendar, FileCheck } from 'lucide-react';
 
 const navItems = [
   { id: 'tasks', label: '任务管理', icon: ClipboardList, path: '/tasks' },
   { id: 'merchants', label: '商户档案', icon: Building2, path: '/merchants' },
+  { id: 'review-calendar', label: '复查日历', icon: Calendar, path: '/review-calendar' },
+  { id: 'summary', label: '巡检摘要', icon: FileCheck, path: '/summary' },
   { id: 'statistics', label: '统计报表', icon: BarChart3, path: '/statistics' },
 ];
 
@@ -12,7 +14,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const showBackButton = location.pathname !== '/tasks' && location.pathname !== '/merchants' && location.pathname !== '/statistics';
+  const mainPaths = ['/tasks', '/merchants', '/statistics', '/review-calendar', '/summary'];
+  const showBackButton = !mainPaths.includes(location.pathname);
 
   const handleBack = () => {
     if (location.pathname.startsWith('/merchants/')) {
@@ -22,6 +25,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     } else {
       navigate('/tasks');
     }
+  };
+
+  const getPageTitle = () => {
+    if (location.pathname === '/tasks') return '任务管理';
+    if (location.pathname === '/merchants') return '商户档案';
+    if (location.pathname === '/statistics') return '统计报表';
+    if (location.pathname === '/review-calendar') return '复查日历';
+    if (location.pathname === '/summary') return '巡检摘要';
+    if (location.pathname.includes('/verify')) return '现场核验';
+    if (location.pathname.includes('/diagnosis')) return '交易诊断';
+    if (location.pathname.includes('/communication')) return '沟通记录';
+    if (location.pathname.includes('/disposal')) return '处置中心';
+    return '风险巡检助手';
   };
 
   return (
@@ -92,15 +108,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <ChevronLeft className="w-5 h-5 text-gray-600" />
                 </button>
               )}
-              <h2 className="text-lg font-semibold text-gray-800">
-                {location.pathname === '/tasks' && '任务管理'}
-                {location.pathname === '/merchants' && '商户档案'}
-                {location.pathname === '/statistics' && '统计报表'}
-                {location.pathname.includes('/verify') && '现场核验'}
-                {location.pathname.includes('/diagnosis') && '交易诊断'}
-                {location.pathname.includes('/communication') && '沟通记录'}
-                {location.pathname.includes('/disposal') && '处置中心'}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-800">{getPageTitle()}</h2>
             </div>
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2">
               <Menu className="w-5 h-5 text-gray-600" />
@@ -108,22 +116,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="p-4 lg:p-6">{children}</div>
+        <div className="p-4 lg:p-6 pb-20 lg:pb-6">{children}</div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 lg:hidden z-40">
         <div className="flex justify-around py-2">
-          {navItems.map((item) => {
+          {navItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
             return (
               <button
                 key={item.id}
                 onClick={() => navigate(item.path)}
-                className={`flex flex-col items-center gap-1 px-4 py-2 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
+                className={`flex flex-col items-center gap-1 px-3 py-2 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
               >
-                <Icon className={`w-6 h-6 ${isActive ? 'stroke-[2.5]' : ''}`} />
-                <span className="text-xs font-medium">{item.label}</span>
+                <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
+                <span className="text-[10px] font-medium">{item.label}</span>
               </button>
             );
           })}

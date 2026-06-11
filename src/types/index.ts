@@ -18,6 +18,17 @@ export interface Task {
   createdAt: string;
 }
 
+export interface TaskStatusChange {
+  id: number;
+  taskId: number;
+  merchantId: number;
+  merchantName: string;
+  oldStatus: string;
+  newStatus: string;
+  changedAt: string;
+  source: string;
+}
+
 export interface Transaction {
   id: number;
   merchantId: number;
@@ -89,6 +100,13 @@ export interface TimelineItem {
   description: string;
   time: string;
   icon: string;
+}
+
+export interface RouteVisitState {
+  taskId: number;
+  visited: boolean;
+  skipped: boolean;
+  completedAt?: string;
 }
 
 export type Priority = 'high' | 'medium' | 'low';

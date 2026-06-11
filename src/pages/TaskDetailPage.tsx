@@ -39,7 +39,7 @@ export default function TaskDetailPage() {
   };
 
   const handleUpdateStatus = (newStatus: TaskStatus) => {
-    const updatedTasks = storage.updateTaskStatus(task.id, newStatus);
+    const updatedTasks = storage.updateTaskStatus(task.id, newStatus, 'task_detail');
     setStatus(newStatus);
     const updatedTask = updatedTasks.find((t) => t.id === task.id);
     if (updatedTask) {

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, MapPin, Clock, Flag, CheckCircle, SkipForward, MapPinOff } from 'lucide-react';
-import { Task } from '../types';
+import { X, MapPin, Clock, CheckCircle, SkipForward, MapPinOff, RefreshCw } from 'lucide-react';
+import { Task, RouteVisitState } from '../types';
 import { storage } from '../utils/storage';
+import { mockMerchants } from '../data/mockData';
 
 interface RoutePlanModalProps {
   isOpen: boolean;
@@ -11,12 +12,13 @@ interface RoutePlanModalProps {
 
 export default function RoutePlanModal({ isOpen, onClose, onStatusChange }: RoutePlanModalProps) {
   const [routeTasks, setRouteTasks] = useState<
-    (Task & { visited: boolean; skipped: boolean; currentIndex: number })[]
+    (Task & { visited: boolean; skipped: boolean; currentIndex: number; address: string })[]
   >([]);
 
   useEffect(() => {
     if (isOpen) {
-      const pendingTasks = storage.getTasks().filter((t) => t.status === 'pending');
+      const pendingTasks = storage.getTasks().filter((t) => t.status === 'pending' || t.status === 'in_progress');
+      const visitStates = storage.getRouteVisitStates();
       const sortedTasks = [...pendingTasks].sort((a, b) => {
         const priorityOrder = { high: 0, medium: 1, low: 2 };
         if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
@@ -24,27 +26,51 @@ export default function RoutePlanModal({ isOpen, onClose, onStatusChange }: Rout
         }
         return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
       });
+
       setRouteTasks(
-        sortedTasks.map((task, index) => ({ ...task, visited: false, skipped: false, currentIndex: index + 1 }))
+        sortedTasks.map((task, index) => {
+          const merchant = mockMerchants.find((m) => m.id === task.merchantId);
+          const state = visitStates.find((s) => s.taskId === task.id);
+          return {
+            ...task,
+            visited: state?.visited || false,
+            skipped: state?.skipped || false,
+            currentIndex: index + 1,
+            address: merchant?.address || '地址未知',
+          };
+        })
       );
     }
   }, [isOpen]);
 
   const handleMarkVisited = (taskId: number) => {
+    storage.updateRouteVisitState(taskId, { visited: true, skipped: false });
     const updated = routeTasks.map((t) => (t.id === taskId ? { ...t, visited: true, skipped: false } : t));
     setRouteTasks(updated);
+    onStatusChange();
   };
 
   const handleSkip = (taskId: number) => {
+    storage.updateRouteVisitState(taskId, { skipped: true, visited: false });
     const updated = routeTasks.map((t) => (t.id === taskId ? { ...t, skipped: true, visited: false } : t));
     setRouteTasks(updated);
+    onStatusChange();
   };
 
   const handleCompleteVisit = (taskId: number) => {
-    storage.updateTaskStatus(taskId, 'completed');
-    const updated = routeTasks.map((t) => (t.id === taskId ? { ...t, visited: true } : t));
+    storage.updateTaskStatus(taskId, 'completed', 'route_plan');
+    storage.updateRouteVisitState(taskId, { visited: true, completedAt: new Date().toLocaleString('zh-CN') });
+    const updated = routeTasks.map((t) => (t.id === taskId ? { ...t, visited: true, skipped: false } : t));
     setRouteTasks(updated);
     onStatusChange();
+  };
+
+  const handleClearRoute = () => {
+    if (confirm('确定要清空今日路线状态吗？这将重置所有到店、跳过状态。')) {
+      storage.clearRouteVisitStates();
+      setRouteTasks(routeTasks.map((t) => ({ ...t, visited: false, skipped: false })));
+      onStatusChange();
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -87,12 +113,21 @@ export default function RoutePlanModal({ isOpen, onClose, onStatusChange }: Rout
             <h2 className="text-lg font-semibold text-gray-800">今日拜访路线</h2>
             <p className="text-sm text-gray-500">
               已完成 {completedCount} / {routeTasks.length} 商户
-              {skippedCount > 0 && <span className="ml-2">| 已跳过 {skippedCount} 商户</span>}
+              {skippedCount > 0 && <span className="ml-2 text-gray-400">| 已跳过 {skippedCount}</span>}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleClearRoute}
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600"
+              title="重置路线状态"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto max-h-[calc(80vh-80px)] p-4 space-y-3">
@@ -125,36 +160,38 @@ export default function RoutePlanModal({ isOpen, onClose, onStatusChange }: Rout
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    待查询地址
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {task.deadline}
-                  </span>
+                <div className="mb-3 space-y-1">
+                  <div className="flex items-start gap-2 text-sm text-gray-500">
+                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span className="line-clamp-2">{task.address}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      截止: {task.deadline}
+                    </span>
+                  </div>
                 </div>
 
                 {!task.visited && !task.skipped && (
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleMarkVisited(task.id)}
-                      className="flex-1 py-2 px-4 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center justify-center gap-1"
+                      className="flex-1 py-2 px-3 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center justify-center gap-1"
                     >
                       <MapPin className="w-4 h-4" />
                       已到店
                     </button>
                     <button
                       onClick={() => handleSkip(task.id)}
-                      className="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
+                      className="flex-1 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
                     >
                       <SkipForward className="w-4 h-4" />
                       跳过
                     </button>
                     <button
                       onClick={() => handleCompleteVisit(task.id)}
-                      className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                      className="flex-1 py-2 px-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
                     >
                       <CheckCircle className="w-4 h-4" />
                       完成
