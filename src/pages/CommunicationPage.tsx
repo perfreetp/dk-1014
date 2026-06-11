@@ -1,32 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { MessageSquare, Calendar, User, Send, FileText } from 'lucide-react';
-import { mockMerchants, mockCommunications } from '../data/mockData';
+import { mockMerchants } from '../data/mockData';
 import { Communication } from '../types';
+import { storage } from '../utils/storage';
 
 export default function CommunicationPage() {
   const { id } = useParams<{ id: string }>();
   const merchant = mockMerchants.find((m) => m.id === parseInt(id!));
-  const [communications, setCommunications] = useState<Communication[]>(
-    mockCommunications.filter((c) => c.merchantId === parseInt(id!))
-  );
+  const [communications, setCommunications] = useState<Communication[]>([]);
   const [newNote, setNewNote] = useState('');
   const [requirements, setRequirements] = useState('');
   const [commitmentDate, setCommitmentDate] = useState('');
   const [recorder, setRecorder] = useState('');
+
+  useEffect(() => {
+    const storedCommunications = storage.getCommunicationsByMerchantId(parseInt(id!));
+    setCommunications(storedCommunications);
+  }, [id]);
 
   if (!merchant) {
     return <div className="text-center text-gray-500 py-10">商户不存在</div>;
   }
 
   const handleSubmit = () => {
-    if (!newNote || !recorder) {
-      alert('请填写访谈要点和记录人');
+    if (!newNote.trim()) {
+      alert('请填写访谈要点');
+      return;
+    }
+    if (!recorder.trim()) {
+      alert('请填写记录人');
       return;
     }
 
     const newCommunication: Communication = {
-      id: communications.length + 1,
+      id: Date.now(),
       merchantId: parseInt(id!),
       notes: newNote,
       rectificationRequirements: requirements,
@@ -35,6 +43,7 @@ export default function CommunicationPage() {
       createdAt: new Date().toISOString().split('T')[0],
     };
 
+    storage.saveCommunication(newCommunication);
     setCommunications([newCommunication, ...communications]);
     setNewNote('');
     setRequirements('');

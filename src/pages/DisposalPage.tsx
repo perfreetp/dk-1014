@@ -1,28 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertTriangle, Clock, CheckCircle, XCircle, Send, DollarSign, Timer, RotateCcw, Unlock } from 'lucide-react';
-import { mockMerchants, mockDisposals } from '../data/mockData';
+import { AlertTriangle, Clock, CheckCircle, XCircle, Send, DollarSign, Timer, RotateCcw, Unlock, Calendar } from 'lucide-react';
+import { mockMerchants } from '../data/mockData';
 import { Disposal, DisposalType } from '../types';
+import { storage } from '../utils/storage';
 
 export default function DisposalPage() {
   const { id } = useParams<{ id: string }>();
   const merchant = mockMerchants.find((m) => m.id === parseInt(id!));
-  const [disposals, setDisposals] = useState<Disposal[]>(
-    mockDisposals.filter((d) => d.merchantId === parseInt(id!))
-  );
+  const [disposals, setDisposals] = useState<Disposal[]>([]);
   const [selectedType, setSelectedType] = useState<DisposalType>('limit');
   const [amount, setAmount] = useState('');
+  const [reviewDate, setReviewDate] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    const storedDisposals = storage.getDisposalsByMerchantId(parseInt(id!));
+    setDisposals(storedDisposals);
+  }, [id]);
 
   if (!merchant) {
     return <div className="text-center text-gray-500 py-10">商户不存在</div>;
   }
 
   const disposalTypes = [
-    { key: 'limit' as DisposalType, label: '限额', icon: DollarSign, desc: '设置交易限额' },
-    { key: 'pause_settlement' as DisposalType, label: '暂停结算', icon: Timer, desc: '暂停商户结算' },
-    { key: 'review' as DisposalType, label: '复查', icon: RotateCcw, desc: '安排复查时间' },
-    { key: 'release' as DisposalType, label: '解除预警', icon: Unlock, desc: '解除风险预警' },
+    { key: 'limit' as DisposalType, label: '限额', icon: DollarSign, desc: '设置交易限额', showAmount: true },
+    { key: 'pause_settlement' as DisposalType, label: '暂停结算', icon: Timer, desc: '暂停商户结算', showAmount: false },
+    { key: 'review' as DisposalType, label: '复查', icon: RotateCcw, desc: '安排复查时间', showAmount: false, showDate: true },
+    { key: 'release' as DisposalType, label: '解除预警', icon: Unlock, desc: '解除风险预警', showAmount: false },
   ];
 
   const statusConfig = {
@@ -32,26 +37,40 @@ export default function DisposalPage() {
   };
 
   const handleSubmit = () => {
-    if (selectedType === 'limit' && !amount) {
-      alert('请输入限额金额');
+    if (selectedType === 'limit' && (!amount || parseFloat(amount) <= 0)) {
+      alert('请输入有效的限额金额');
       return;
     }
 
     const newDisposal: Disposal = {
-      id: disposals.length + 1,
+      id: Date.now(),
       merchantId: parseInt(id!),
       type: selectedType,
-      amount: parseFloat(amount) || 0,
+      amount: selectedType === 'limit' ? parseFloat(amount) : 0,
       status: 'pending',
       approver: '',
       createdAt: new Date().toISOString().split('T')[0],
     };
 
+    storage.saveDisposal(newDisposal);
     setDisposals([newDisposal, ...disposals]);
     setAmount('');
+    setReviewDate('');
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
     alert('处置申请已提交，等待审批');
+  };
+
+  const getDisposalInfo = (disposal: Disposal) => {
+    const typeConfig = disposalTypes.find((t) => t.key === disposal.type);
+    const info: string[] = [];
+    if (disposal.type === 'limit' && disposal.amount > 0) {
+      info.push(`限额: ¥${disposal.amount.toLocaleString()}`);
+    }
+    if (disposal.type === 'review') {
+      info.push('已安排复查');
+    }
+    return info;
   };
 
   return (
@@ -115,6 +134,21 @@ export default function DisposalPage() {
           </div>
         )}
 
+        {selectedType === 'review' && (
+          <div className="mt-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <Calendar className="w-4 h-4" />
+              复查日期
+            </label>
+            <input
+              type="date"
+              value={reviewDate}
+              onChange={(e) => setReviewDate(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+
         <button
           onClick={handleSubmit}
           className={`w-full mt-6 py-4 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
@@ -145,6 +179,7 @@ export default function DisposalPage() {
             {disposals.map((disposal) => {
               const typeLabel = disposalTypes.find((t) => t.key === disposal.type)?.label || disposal.type;
               const StatusIcon = statusConfig[disposal.status].icon;
+              const infoList = getDisposalInfo(disposal);
               return (
                 <div key={disposal.id} className="border border-gray-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -154,8 +189,12 @@ export default function DisposalPage() {
                       {statusConfig[disposal.status].label}
                     </span>
                   </div>
-                  {disposal.amount > 0 && (
-                    <p className="text-sm text-gray-600">金额: ¥{disposal.amount.toLocaleString()}</p>
+                  {infoList.length > 0 && (
+                    <div className="space-y-1">
+                      {infoList.map((info, idx) => (
+                        <p key={idx} className="text-sm text-gray-600">{info}</p>
+                      ))}
+                    </div>
                   )}
                   <p className="text-xs text-gray-400 mt-2">{disposal.createdAt}</p>
                 </div>

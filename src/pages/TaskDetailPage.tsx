@@ -1,19 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Clock, Building2, Camera, FileText, MessageSquare, AlertTriangle, CheckCircle } from 'lucide-react';
 import { mockTasks, mockMerchants } from '../data/mockData';
 import { TaskStatus } from '../types';
+import { storage } from '../utils/storage';
 
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const task = mockTasks.find((t) => t.id === parseInt(id!));
-  const merchant = task ? mockMerchants.find((m) => m.id === task.merchantId) : null;
+  const [task, setTask] = useState(mockTasks.find((t) => t.id === parseInt(id!)));
   const [status, setStatus] = useState<TaskStatus>(task?.status || 'pending');
 
-  if (!task || !merchant) {
+  useEffect(() => {
+    const storedTasks = storage.getTasks();
+    const storedTask = storedTasks.find((t) => t.id === parseInt(id!));
+    if (storedTask) {
+      setTask(storedTask);
+      setStatus(storedTask.status);
+    }
+  }, [id]);
+
+  if (!task) {
     return <div className="text-center text-gray-500 py-10">任务不存在</div>;
   }
+
+  const merchant = mockMerchants.find((m) => m.id === task.merchantId);
 
   const statusConfig = {
     pending: { label: '待处理', color: 'bg-gray-100 text-gray-700' },
@@ -28,7 +39,12 @@ export default function TaskDetailPage() {
   };
 
   const handleUpdateStatus = (newStatus: TaskStatus) => {
+    const updatedTasks = storage.updateTaskStatus(task.id, newStatus);
     setStatus(newStatus);
+    const updatedTask = updatedTasks.find((t) => t.id === task.id);
+    if (updatedTask) {
+      setTask(updatedTask);
+    }
     alert(`任务状态已更新为: ${statusConfig[newStatus].label}`);
   };
 
@@ -50,11 +66,11 @@ export default function TaskDetailPage() {
         <div className="space-y-3 text-sm text-gray-600">
           <div className="flex items-center gap-3">
             <MapPin className="w-5 h-5 text-blue-500" />
-            <span>{merchant.address}</span>
+            <span>{merchant?.address}</span>
           </div>
           <div className="flex items-center gap-3">
             <Building2 className="w-5 h-5 text-blue-500" />
-            <span>收单费率: {merchant.rate * 100}%</span>
+            <span>收单费率: {merchant?.rate * 100}%</span>
           </div>
           <div className="flex items-center gap-3">
             <Clock className="w-5 h-5 text-blue-500" />
@@ -87,7 +103,7 @@ export default function TaskDetailPage() {
 
       <div className="grid grid-cols-2 gap-4">
         <button
-          onClick={() => navigate(`/merchants/${merchant.id}`)}
+          onClick={() => navigate(`/merchants/${merchant?.id}`)}
           className="bg-white rounded-xl p-4 shadow-sm flex flex-col items-center gap-2 hover:bg-gray-50 transition-colors"
         >
           <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -97,7 +113,7 @@ export default function TaskDetailPage() {
         </button>
 
         <button
-          onClick={() => navigate(`/merchants/${merchant.id}/verify`)}
+          onClick={() => navigate(`/merchants/${merchant?.id}/verify`)}
           className="bg-white rounded-xl p-4 shadow-sm flex flex-col items-center gap-2 hover:bg-gray-50 transition-colors"
         >
           <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -107,7 +123,7 @@ export default function TaskDetailPage() {
         </button>
 
         <button
-          onClick={() => navigate(`/merchants/${merchant.id}/diagnosis`)}
+          onClick={() => navigate(`/merchants/${merchant?.id}/diagnosis`)}
           className="bg-white rounded-xl p-4 shadow-sm flex flex-col items-center gap-2 hover:bg-gray-50 transition-colors"
         >
           <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -117,7 +133,7 @@ export default function TaskDetailPage() {
         </button>
 
         <button
-          onClick={() => navigate(`/merchants/${merchant.id}/communication`)}
+          onClick={() => navigate(`/merchants/${merchant?.id}/communication`)}
           className="bg-white rounded-xl p-4 shadow-sm flex flex-col items-center gap-2 hover:bg-gray-50 transition-colors"
         >
           <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -128,7 +144,7 @@ export default function TaskDetailPage() {
       </div>
 
       <button
-        onClick={() => navigate(`/merchants/${merchant.id}/disposal`)}
+        onClick={() => navigate(`/merchants/${merchant?.id}/disposal`)}
         className="w-full bg-orange-500 text-white rounded-xl p-4 flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors"
       >
         <AlertTriangle className="w-5 h-5" />

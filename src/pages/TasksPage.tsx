@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Clock, AlertCircle, CheckCircle, Navigation, Filter, Search } from 'lucide-react';
-import { mockTasks, mockMerchants } from '../data/mockData';
+import { mockMerchants } from '../data/mockData';
 import { Task, Priority, TaskStatus } from '../types';
+import { storage } from '../utils/storage';
+import RoutePlanModal from '../components/RoutePlanModal';
 
 const priorityConfig = {
   high: { label: '高', color: 'bg-red-100 text-red-700 border-red-200' },
@@ -17,11 +19,19 @@ const statusConfig = {
 };
 
 export default function TasksPage() {
-  const [tasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showRouteModal, setShowRouteModal] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const storedTasks = storage.getTasks();
+    if (storedTasks.length > 0) {
+      setTasks(storedTasks);
+    }
+  }, []);
 
   const filteredTasks = tasks.filter((task) => {
     const matchesPriority = filterPriority === 'all' || task.priority === filterPriority;
@@ -39,7 +49,7 @@ export default function TasksPage() {
   };
 
   const handlePlanRoute = () => {
-    alert('路线规划功能已启动');
+    setShowRouteModal(true);
   };
 
   return (
@@ -172,6 +182,10 @@ export default function TasksPage() {
           )}
         </div>
       </div>
+
+      {showRouteModal && (
+        <RoutePlanModal tasks={tasks} onClose={() => setShowRouteModal(false)} />
+      )}
     </div>
   );
 }

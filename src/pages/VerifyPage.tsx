@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Camera, Upload, CheckCircle, Store, Receipt, FileText, Monitor } from 'lucide-react';
 import { mockMerchants } from '../data/mockData';
+import { storage } from '../utils/storage';
+import { Verification } from '../types';
 
 export default function VerifyPage() {
   const { id } = useParams<{ id: string }>();
   const merchant = mockMerchants.find((m) => m.id === parseInt(id!));
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentImageType, setCurrentImageType] = useState<'storefront' | 'checkout' | 'license'>('storefront');
   const [images, setImages] = useState({
     storefront: '',
     checkout: '',
@@ -14,22 +18,60 @@ export default function VerifyPage() {
   const [terminalNumber, setTerminalNumber] = useState('');
   const [verified, setVerified] = useState(false);
 
+  useEffect(() => {
+    const existingVerification = storage.getVerificationByMerchantId(parseInt(id!));
+    if (existingVerification) {
+      setImages({
+        storefront: existingVerification.storefrontImage,
+        checkout: existingVerification.checkoutImage,
+        license: existingVerification.licenseImage,
+      });
+      setTerminalNumber(existingVerification.terminalNumber);
+      setVerified(true);
+    }
+  }, [id]);
+
   if (!merchant) {
     return <div className="text-center text-gray-500 py-10">商户不存在</div>;
   }
 
-  const handleImageUpload = (type: 'storefront' | 'checkout' | 'license') => {
-    const mockImage = `https://neeko-copilot.bytedance.net/api/text_to_image?prompt=business%20${type === 'storefront' ? 'store%20front%20exterior' : type === 'checkout' ? 'cash%20register%20desk' : 'business%20license%20document'}&image_size=portrait_4_3`;
-    setImages((prev) => ({ ...prev, [type]: mockImage }));
+  const handleImageUploadClick = (type: 'storefront' | 'checkout' | 'license') => {
+    setCurrentImageType(type);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setImages((prev) => ({ ...prev, [currentImageType]: result }));
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
   };
 
   const handleSubmit = () => {
-    if (images.storefront && images.checkout && images.license && terminalNumber) {
-      setVerified(true);
-      alert('核验信息已提交成功');
-    } else {
+    if (!images.storefront || !images.checkout || !images.license || !terminalNumber) {
       alert('请完成所有核验项');
+      return;
     }
+
+    const verification: Verification = {
+      id: Date.now(),
+      merchantId: parseInt(id!),
+      storefrontImage: images.storefront,
+      checkoutImage: images.checkout,
+      licenseImage: images.license,
+      terminalNumber: terminalNumber,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+
+    storage.saveVerification(verification);
+    setVerified(true);
+    alert('核验信息已提交成功');
   };
 
   const verifyItems = [
@@ -40,6 +82,15 @@ export default function VerifyPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       <div className="bg-white rounded-xl p-6 shadow-sm">
         <h1 className="text-xl font-bold text-gray-800 mb-4">现场核验 - {merchant.name}</h1>
         
@@ -71,7 +122,7 @@ export default function VerifyPage() {
                       className="w-full h-48 object-cover rounded-lg"
                     />
                     <button
-                      onClick={() => handleImageUpload(item.key as 'storefront' | 'checkout' | 'license')}
+                      onClick={() => handleImageUploadClick(item.key as 'storefront' | 'checkout' | 'license')}
                       className="absolute top-2 right-2 bg-white/90 p-2 rounded-full shadow-md hover:bg-white transition-colors"
                     >
                       <Camera className="w-4 h-4 text-gray-600" />
@@ -79,7 +130,7 @@ export default function VerifyPage() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => handleImageUpload(item.key as 'storefront' | 'checkout' | 'license')}
+                    onClick={() => handleImageUploadClick(item.key as 'storefront' | 'checkout' | 'license')}
                     className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-blue-400 transition-colors"
                   >
                     <Camera className="w-8 h-8 text-gray-400" />
