@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, Building2, FileText, BarChart3, MessageSquare, Settings, Menu, X, ChevronLeft, Calendar, FileCheck } from 'lucide-react';
+import { ClipboardList, Building2, FileText, BarChart3, MessageSquare, Settings, Menu, X, ChevronLeft, Calendar, FileCheck, LayoutDashboard } from 'lucide-react';
 
 const navItems = [
   { id: 'tasks', label: '任务管理', icon: ClipboardList, path: '/tasks' },
   { id: 'merchants', label: '商户档案', icon: Building2, path: '/merchants' },
+  { id: 'daily-summary', label: '日终汇总', icon: LayoutDashboard, path: '/daily-summary' },
   { id: 'review-calendar', label: '复查日历', icon: Calendar, path: '/review-calendar' },
   { id: 'summary', label: '巡检摘要', icon: FileCheck, path: '/summary' },
   { id: 'statistics', label: '统计报表', icon: BarChart3, path: '/statistics' },
@@ -14,7 +15,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const mainPaths = ['/tasks', '/merchants', '/statistics', '/review-calendar', '/summary'];
+  const mainPaths = ['/tasks', '/merchants', '/statistics', '/review-calendar', '/summary', '/daily-summary'];
   const showBackButton = !mainPaths.includes(location.pathname);
 
   const handleBack = () => {
@@ -33,6 +34,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (location.pathname === '/statistics') return '统计报表';
     if (location.pathname === '/review-calendar') return '复查日历';
     if (location.pathname === '/summary') return '巡检摘要';
+    if (location.pathname === '/daily-summary') return '日终汇总';
     if (location.pathname.includes('/verify')) return '现场核验';
     if (location.pathname.includes('/diagnosis')) return '交易诊断';
     if (location.pathname.includes('/communication')) return '沟通记录';

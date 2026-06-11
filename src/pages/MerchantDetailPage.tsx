@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MapPin, Building2, Phone, FileText, Camera, BarChart3, MessageSquare, AlertTriangle, Clock, History } from 'lucide-react';
+import { MapPin, Building2, Phone, FileText, Camera, BarChart3, MessageSquare, AlertTriangle, Clock, History, Filter, ChevronRight } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, BarElement } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import { mockMerchants, mockTransactions, mockComplaints, generateDailyTransactions } from '../data/mockData';
@@ -18,6 +18,7 @@ export default function MerchantDetailPage() {
   const complaints = mockComplaints.filter((c) => c.merchantId === parseInt(id!));
   const dailyData = generateDailyTransactions();
   const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
+  const [filterType, setFilterType] = useState<string>('all');
 
   useEffect(() => {
     const merchantId = parseInt(id!);
@@ -82,6 +83,25 @@ export default function MerchantDetailPage() {
     items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
     setTimelineItems(items);
   }, [id]);
+
+  const filteredTimelineItems = filterType === 'all'
+    ? timelineItems
+    : timelineItems.filter((item) => item.type === filterType);
+
+  const handleTimelineItemClick = (item: TimelineItem) => {
+    if (item.type === 'verification') {
+      navigate(`/merchants/${id}/verify`);
+    } else if (item.type === 'communication') {
+      navigate(`/merchants/${id}/communication`);
+    } else if (item.type === 'disposal') {
+      navigate(`/merchants/${id}/disposal`);
+    } else if (item.type === 'task') {
+      const tasks = storage.getTasks().filter((t) => t.merchantId === parseInt(id!));
+      if (tasks.length > 0) {
+        navigate(`/tasks/${tasks[0].id}`);
+      }
+    }
+  };
 
   if (!merchant) {
     return <div className="text-center text-gray-500 py-10">商户不存在</div>;
@@ -168,11 +188,70 @@ export default function MerchantDetailPage() {
       </div>
 
       <div className="bg-white rounded-xl p-6 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <History className="w-5 h-5 text-gray-600" />
-          <h2 className="font-semibold text-gray-800">时间线</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <History className="w-5 h-5 text-gray-600" />
+            <h2 className="font-semibold text-gray-800">时间线</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-400" />
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="text-sm border border-gray-200 rounded-lg px-2 py-1"
+            >
+              <option value="all">全部</option>
+              <option value="task">任务</option>
+              <option value="verification">核验</option>
+              <option value="communication">沟通</option>
+              <option value="disposal">处置</option>
+            </select>
+          </div>
         </div>
-        <Timeline items={timelineItems} />
+
+        {filteredTimelineItems.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p>暂无{filterType !== 'all' ? '该类型' : ''}记录</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredTimelineItems.map((item, index) => (
+              <div
+                key={item.id}
+                onClick={() => handleTimelineItemClick(item)}
+                className="flex gap-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+              >
+                <div className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    item.type === 'task' ? 'bg-blue-100 text-blue-600' :
+                    item.type === 'verification' ? 'bg-green-100 text-green-600' :
+                    item.type === 'communication' ? 'bg-purple-100 text-purple-600' :
+                    'bg-orange-100 text-orange-600'
+                  }`}>
+                    {item.type === 'task' && <FileText className="w-5 h-5" />}
+                    {item.type === 'verification' && <Camera className="w-5 h-5" />}
+                    {item.type === 'communication' && <MessageSquare className="w-5 h-5" />}
+                    {item.type === 'disposal' && <AlertTriangle className="w-5 h-5" />}
+                  </div>
+                  {index < filteredTimelineItems.length - 1 && (
+                    <div className="w-0.5 h-8 bg-gray-200 mt-2" />
+                  )}
+                </div>
+                <div className="flex-1 pb-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-gray-800">{item.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">{item.time}</span>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl p-6 shadow-sm">

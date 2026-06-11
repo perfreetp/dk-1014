@@ -11,6 +11,7 @@ import DisposalPage from './pages/DisposalPage';
 import StatisticsPage from './pages/StatisticsPage';
 import ReviewCalendarPage from './pages/ReviewCalendarPage';
 import SummaryPage from './pages/SummaryPage';
+import DailySummaryPage from './pages/DailySummaryPage';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/statistics" element={<StatisticsPage />} />
           <Route path="/review-calendar" element={<ReviewCalendarPage />} />
           <Route path="/summary" element={<SummaryPage />} />
+          <Route path="/daily-summary" element={<DailySummaryPage />} />
           <Route path="/" element={<TasksPage />} />
         </Routes>
       </Layout>
