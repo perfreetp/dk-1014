@@ -184,7 +184,7 @@ export default function TasksPage() {
       </div>
 
       {showRouteModal && (
-        <RoutePlanModal tasks={tasks} onClose={() => setShowRouteModal(false)} />
+        <RoutePlanModal isOpen={showRouteModal} onClose={() => setShowRouteModal(false)} onStatusChange={() => setTasks(storage.getTasks())} />
       )}
     </div>
   );

@@ -45,6 +45,7 @@ export interface Communication {
   commitmentDate: string;
   recorder: string;
   createdAt: string;
+  followedUp: boolean;
 }
 
 export interface Disposal {
@@ -55,6 +56,7 @@ export interface Disposal {
   status: 'pending' | 'approved' | 'rejected';
   approver: string;
   createdAt: string;
+  reviewDate?: string;
 }
 
 export interface Complaint {
@@ -78,6 +80,15 @@ export interface Statistics {
   completionRate: number;
   riskDistribution: { type: string; count: number }[];
   personalPerformance: { name: string; score: number; completedTasks: number }[];
+}
+
+export interface TimelineItem {
+  id: string;
+  type: 'task' | 'verification' | 'communication' | 'disposal';
+  title: string;
+  description: string;
+  time: string;
+  icon: string;
 }
 
 export type Priority = 'high' | 'medium' | 'low';

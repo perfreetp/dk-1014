@@ -1,44 +1,37 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { AlertTriangle, Clock, CheckCircle, XCircle, Send, DollarSign, Timer, RotateCcw, Unlock, Calendar } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { AlertTriangle, CheckCircle, Clock, Send, Wallet, Pause, RefreshCw, ShieldOff } from 'lucide-react';
 import { mockMerchants } from '../data/mockData';
-import { Disposal, DisposalType } from '../types';
 import { storage } from '../utils/storage';
+import { Disposal, DisposalType } from '../types';
 
 export default function DisposalPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const merchant = mockMerchants.find((m) => m.id === parseInt(id!));
   const [disposals, setDisposals] = useState<Disposal[]>([]);
+
   const [selectedType, setSelectedType] = useState<DisposalType>('limit');
-  const [amount, setAmount] = useState('');
-  const [reviewDate, setReviewDate] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [formData, setFormData] = useState({
+    amount: '',
+    approver: '',
+    reviewDate: '',
+  });
 
   useEffect(() => {
-    const storedDisposals = storage.getDisposalsByMerchantId(parseInt(id!));
-    setDisposals(storedDisposals);
+    const merchantId = parseInt(id!);
+    const existingDisposals = storage.getDisposalsByMerchantId(merchantId);
+    setDisposals(existingDisposals);
   }, [id]);
 
-  if (!merchant) {
-    return <div className="text-center text-gray-500 py-10">商户不存在</div>;
-  }
-
-  const disposalTypes = [
-    { key: 'limit' as DisposalType, label: '限额', icon: DollarSign, desc: '设置交易限额', showAmount: true },
-    { key: 'pause_settlement' as DisposalType, label: '暂停结算', icon: Timer, desc: '暂停商户结算', showAmount: false },
-    { key: 'review' as DisposalType, label: '复查', icon: RotateCcw, desc: '安排复查时间', showAmount: false, showDate: true },
-    { key: 'release' as DisposalType, label: '解除预警', icon: Unlock, desc: '解除风险预警', showAmount: false },
-  ];
-
-  const statusConfig = {
-    pending: { label: '待审批', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
-    approved: { label: '已批准', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-    rejected: { label: '已拒绝', color: 'bg-red-100 text-red-700', icon: XCircle },
-  };
-
   const handleSubmit = () => {
-    if (selectedType === 'limit' && (!amount || parseFloat(amount) <= 0)) {
-      alert('请输入有效的限额金额');
+    if (!formData.approver.trim()) {
+      alert('请填写审批人');
+      return;
+    }
+
+    if (selectedType === 'limit' && (!formData.amount || parseFloat(formData.amount) <= 0)) {
+      alert('请填写有效的限额金额');
       return;
     }
 
@@ -46,157 +39,199 @@ export default function DisposalPage() {
       id: Date.now(),
       merchantId: parseInt(id!),
       type: selectedType,
-      amount: selectedType === 'limit' ? parseFloat(amount) : 0,
+      amount: formData.amount ? parseFloat(formData.amount) : 0,
       status: 'pending',
-      approver: '',
-      createdAt: new Date().toISOString().split('T')[0],
+      approver: formData.approver,
+      createdAt: new Date().toLocaleString('zh-CN'),
+      reviewDate: selectedType === 'review' ? formData.reviewDate : undefined,
     };
 
     storage.saveDisposal(newDisposal);
-    setDisposals([newDisposal, ...disposals]);
-    setAmount('');
-    setReviewDate('');
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
-    alert('处置申请已提交，等待审批');
+    setDisposals((prev) => [newDisposal, ...prev]);
+    setFormData({ amount: '', approver: '', reviewDate: '' });
+    alert('处置申请已提交');
   };
 
-  const getDisposalInfo = (disposal: Disposal) => {
-    const typeConfig = disposalTypes.find((t) => t.key === disposal.type);
-    const info: string[] = [];
-    if (disposal.type === 'limit' && disposal.amount > 0) {
-      info.push(`限额: ¥${disposal.amount.toLocaleString()}`);
-    }
-    if (disposal.type === 'review') {
-      info.push('已安排复查');
-    }
-    return info;
+  const handleBack = () => {
+    navigate(`/merchants/${id}`);
   };
+
+  const getTypeInfo = (type: DisposalType) => {
+    switch (type) {
+      case 'limit':
+        return { label: '限额', icon: Wallet, color: 'text-yellow-600 bg-yellow-100' };
+      case 'pause_settlement':
+        return { label: '暂停结算', icon: Pause, color: 'text-red-600 bg-red-100' };
+      case 'review':
+        return { label: '复查', icon: RefreshCw, color: 'text-blue-600 bg-blue-100' };
+      case 'release':
+        return { label: '解除预警', icon: ShieldOff, color: 'text-green-600 bg-green-100' };
+      default:
+        return { label: '未知', icon: AlertTriangle, color: 'text-gray-600 bg-gray-100' };
+    }
+  };
+
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return { label: '待审批', color: 'text-yellow-600 bg-yellow-100' };
+      case 'approved':
+        return { label: '已批准', color: 'text-green-600 bg-green-100' };
+      case 'rejected':
+        return { label: '已拒绝', color: 'text-red-600 bg-red-100' };
+      default:
+        return { label: '未知', color: 'text-gray-600 bg-gray-100' };
+    }
+  };
+
+  if (!merchant) {
+    return <div className="text-center text-gray-500 py-10">商户不存在</div>;
+  }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-6 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-8 h-8" />
-          <div>
-            <h1 className="text-xl font-bold">处置中心</h1>
-            <p className="text-orange-200 text-sm">{merchant.name}</p>
-          </div>
-        </div>
-        <p className="text-sm text-orange-100">
-          根据交易诊断结果，选择合适的处置措施，提交后需等待审批。
-        </p>
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+        <button onClick={handleBack} className="text-gray-500 hover:text-gray-700 mb-4">
+          ← 返回商户档案
+        </button>
+        <h1 className="text-lg font-bold text-gray-800">{merchant.name}</h1>
+        <p className="text-sm text-gray-500">处置中心</p>
       </div>
 
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h2 className="font-semibold text-gray-800 mb-4">选择处置类型</h2>
-        
-        <div className="grid grid-cols-2 gap-3">
-          {disposalTypes.map((type) => {
-            const Icon = type.icon;
-            return (
-              <button
-                key={type.key}
-                onClick={() => setSelectedType(type.key)}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  selectedType === type.key
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
-                  selectedType === type.key ? 'bg-blue-100' : 'bg-gray-100'
-                }`}>
-                  <Icon className={`w-5 h-5 ${selectedType === type.key ? 'text-blue-600' : 'text-gray-500'}`} />
-                </div>
-                <h3 className={`font-medium ${selectedType === type.key ? 'text-blue-700' : 'text-gray-800'}`}>
-                  {type.label}
-                </h3>
-                <p className="text-xs text-gray-500 mt-1">{type.desc}</p>
-              </button>
-            );
-          })}
+      <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+        <h2 className="font-semibold text-gray-800 mb-4">发起处置申请</h2>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">处置类型</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(['limit', 'pause_settlement', 'review', 'release'] as DisposalType[]).map((type) => {
+              const info = getTypeInfo(type);
+              const Icon = info.icon;
+              return (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setSelectedType(type);
+                    setFormData({ amount: '', approver: '', reviewDate: '' });
+                  }}
+                  className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                    selectedType === type
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-100 hover:border-gray-200'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${selectedType === type ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span className={`text-sm font-medium ${selectedType === type ? 'text-blue-700' : 'text-gray-700'}`}>
+                    {info.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {selectedType === 'limit' && (
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">限额金额（元）</label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="请输入限额金额"
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        )}
-
-        {selectedType === 'review' && (
-          <div className="mt-4">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="w-4 h-4" />
-              复查日期
-            </label>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">限额金额</label>
             <input
-              type="date"
-              value={reviewDate}
-              onChange={(e) => setReviewDate(e.target.value)}
+              type="number"
+              value={formData.amount}
+              onChange={(e) => setFormData((prev) => ({ ...prev, amount: e.target.value }))}
+              placeholder="请输入限额金额"
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         )}
 
+        {selectedType === 'review' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">复查日期</label>
+            <input
+              type="date"
+              value={formData.reviewDate}
+              onChange={(e) => setFormData((prev) => ({ ...prev, reviewDate: e.target.value }))}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">审批人</label>
+          <input
+            type="text"
+            value={formData.approver}
+            onChange={(e) => setFormData((prev) => ({ ...prev, approver: e.target.value }))}
+            placeholder="请输入审批人姓名"
+            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         <button
           onClick={handleSubmit}
-          className={`w-full mt-6 py-4 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
-            submitted ? 'bg-green-500' : 'bg-orange-500 hover:bg-orange-600'
-          } text-white`}
+          className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
         >
-          {submitted ? (
-            <>
-              <CheckCircle className="w-5 h-5" />
-              提交成功
-            </>
-          ) : (
-            <>
-              <Send className="w-5 h-5" />
-              提交处置申请
-            </>
-          )}
+          <Send className="w-4 h-4" />
+          提交申请
         </button>
       </div>
 
-      <div className="bg-white rounded-xl p-6 shadow-sm">
+      <div className="bg-white rounded-xl p-4 shadow-sm">
         <h2 className="font-semibold text-gray-800 mb-4">历史处置记录</h2>
-        
+
         {disposals.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">暂无处置记录</p>
+          <div className="text-center py-8 text-gray-500">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p>暂无处置记录</p>
+          </div>
         ) : (
           <div className="space-y-3">
             {disposals.map((disposal) => {
-              const typeLabel = disposalTypes.find((t) => t.key === disposal.type)?.label || disposal.type;
-              const StatusIcon = statusConfig[disposal.status].icon;
-              const infoList = getDisposalInfo(disposal);
+              const typeInfo = getTypeInfo(disposal.type);
+              const statusInfo = getStatusInfo(disposal.status);
+              const TypeIcon = typeInfo.icon;
+
               return (
-                <div key={disposal.id} className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-800">{typeLabel}</span>
-                    <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig[disposal.status].color}`}>
-                      <StatusIcon className="w-3 h-3" />
-                      {statusConfig[disposal.status].label}
-                    </span>
-                  </div>
-                  {infoList.length > 0 && (
-                    <div className="space-y-1">
-                      {infoList.map((info, idx) => (
-                        <p key={idx} className="text-sm text-gray-600">{info}</p>
-                      ))}
+                <div key={disposal.id} className="p-4 rounded-xl border border-gray-100 bg-white">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeInfo.color}`}>
+                        <TypeIcon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-800">{typeInfo.label}</h3>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                  <p className="text-xs text-gray-400 mt-2">{disposal.createdAt}</p>
+                    <span className="text-xs text-gray-400">{disposal.createdAt}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {disposal.type === 'limit' && (
+                      <div className="p-2 bg-yellow-50 rounded-lg">
+                        <p className="text-xs text-gray-500">限额金额</p>
+                        <p className="font-medium text-yellow-700">¥{disposal.amount.toLocaleString()}</p>
+                      </div>
+                    )}
+
+                    {disposal.type === 'review' && disposal.reviewDate && (
+                      <div className="p-2 bg-blue-50 rounded-lg">
+                        <p className="text-xs text-gray-500">复查日期</p>
+                        <p className="font-medium text-blue-700">{disposal.reviewDate}</p>
+                      </div>
+                    )}
+
+                    <div className="p-2 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500">审批人</p>
+                      <p className="font-medium text-gray-700">{disposal.approver}</p>
+                    </div>
+
+                    <div className="p-2 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500">状态</p>
+                      <p className="font-medium text-gray-700">{statusInfo.label}</p>
+                    </div>
+                  </div>
                 </div>
               );
             })}

@@ -39,18 +39,13 @@ export const storage = {
 
   saveVerification: (verification: Verification) => {
     const verifications = storage.getVerifications();
-    const existingIndex = verifications.findIndex((v) => v.merchantId === verification.merchantId);
-    if (existingIndex >= 0) {
-      verifications[existingIndex] = verification;
-    } else {
-      verifications.push(verification);
-    }
+    verifications.push(verification);
     localStorage.setItem(VERIFICATIONS_KEY, JSON.stringify(verifications));
   },
 
-  getVerificationByMerchantId: (merchantId: number): Verification | undefined => {
+  getVerificationsByMerchantId: (merchantId: number): Verification[] => {
     const verifications = storage.getVerifications();
-    return verifications.find((v) => v.merchantId === merchantId);
+    return verifications.filter((v) => v.merchantId === merchantId);
   },
 
   getCommunications: (): Communication[] => {
@@ -71,6 +66,15 @@ export const storage = {
   getCommunicationsByMerchantId: (merchantId: number): Communication[] => {
     const communications = storage.getCommunications();
     return communications.filter((c) => c.merchantId === merchantId);
+  },
+
+  toggleCommunicationFollowedUp: (communicationId: number) => {
+    const communications = storage.getCommunications();
+    const updatedCommunications = communications.map((c) =>
+      c.id === communicationId ? { ...c, followedUp: !c.followedUp } : c
+    );
+    localStorage.setItem(COMMUNICATIONS_KEY, JSON.stringify(updatedCommunications));
+    return updatedCommunications;
   },
 
   getDisposals: (): Disposal[] => {

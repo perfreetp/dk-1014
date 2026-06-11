@@ -1,189 +1,270 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { Camera, Upload, CheckCircle, Store, Receipt, FileText, Monitor } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Camera, Upload, Store, CreditCard, FileText, Monitor, Plus, X, ChevronRight, Calendar } from 'lucide-react';
 import { mockMerchants } from '../data/mockData';
 import { storage } from '../utils/storage';
 import { Verification } from '../types';
 
 export default function VerifyPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const merchant = mockMerchants.find((m) => m.id === parseInt(id!));
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [currentImageType, setCurrentImageType] = useState<'storefront' | 'checkout' | 'license'>('storefront');
-  const [images, setImages] = useState({
-    storefront: '',
-    checkout: '',
-    license: '',
+  const [verifications, setVerifications] = useState<Verification[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedVerification, setSelectedVerification] = useState<Verification | null>(null);
+
+  const [formData, setFormData] = useState({
+    storefrontImage: '',
+    checkoutImage: '',
+    licenseImage: '',
+    terminalNumber: '',
   });
-  const [terminalNumber, setTerminalNumber] = useState('');
-  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    const existingVerification = storage.getVerificationByMerchantId(parseInt(id!));
-    if (existingVerification) {
-      setImages({
-        storefront: existingVerification.storefrontImage,
-        checkout: existingVerification.checkoutImage,
-        license: existingVerification.licenseImage,
-      });
-      setTerminalNumber(existingVerification.terminalNumber);
-      setVerified(true);
-    }
+    const merchantId = parseInt(id!);
+    const existingVerifications = storage.getVerificationsByMerchantId(merchantId);
+    setVerifications(existingVerifications);
   }, [id]);
+
+  const handleImageUpload = (field: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFormData((prev) => ({ ...prev, [field]: event.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = () => {
+    const newVerification: Verification = {
+      id: Date.now(),
+      merchantId: parseInt(id!),
+      storefrontImage: formData.storefrontImage,
+      checkoutImage: formData.checkoutImage,
+      licenseImage: formData.licenseImage,
+      terminalNumber: formData.terminalNumber,
+      createdAt: new Date().toLocaleString('zh-CN'),
+    };
+
+    storage.saveVerification(newVerification);
+    setVerifications((prev) => [newVerification, ...prev]);
+    setFormData({ storefrontImage: '', checkoutImage: '', licenseImage: '', terminalNumber: '' });
+    alert('核验记录已保存');
+  };
+
+  const handleBack = () => {
+    navigate(`/merchants/${id}`);
+  };
 
   if (!merchant) {
     return <div className="text-center text-gray-500 py-10">商户不存在</div>;
   }
 
-  const handleImageUploadClick = (type: 'storefront' | 'checkout' | 'license') => {
-    setCurrentImageType(type);
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setImages((prev) => ({ ...prev, [currentImageType]: result }));
-      };
-      reader.readAsDataURL(file);
-    }
-    e.target.value = '';
-  };
-
-  const handleSubmit = () => {
-    if (!images.storefront || !images.checkout || !images.license || !terminalNumber) {
-      alert('请完成所有核验项');
-      return;
-    }
-
-    const verification: Verification = {
-      id: Date.now(),
-      merchantId: parseInt(id!),
-      storefrontImage: images.storefront,
-      checkoutImage: images.checkout,
-      licenseImage: images.license,
-      terminalNumber: terminalNumber,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-
-    storage.saveVerification(verification);
-    setVerified(true);
-    alert('核验信息已提交成功');
-  };
-
-  const verifyItems = [
-    { key: 'storefront', label: '门头照片', icon: Store, desc: '拍摄商户门头全貌' },
-    { key: 'checkout', label: '收银台照片', icon: Receipt, desc: '拍摄收银台及设备' },
-    { key: 'license', label: '营业执照', icon: FileText, desc: '拍摄营业执照正本' },
-  ];
-
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFileChange}
-        className="hidden"
-      />
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+        <button onClick={handleBack} className="text-gray-500 hover:text-gray-700 mb-4">
+          ← 返回商户档案
+        </button>
+        <h1 className="text-lg font-bold text-gray-800">{merchant.name}</h1>
+        <p className="text-sm text-gray-500">现场核验</p>
+      </div>
 
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h1 className="text-xl font-bold text-gray-800 mb-4">现场核验 - {merchant.name}</h1>
-        
+      <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-gray-800">新增核验记录</h2>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-1 text-blue-600 text-sm hover:text-blue-700"
+          >
+            查看历史记录
+            <ChevronRight className={`w-4 h-4 transition-transform ${showHistory ? 'rotate-90' : ''}`} />
+          </button>
+        </div>
+
         <div className="space-y-4">
-          {verifyItems.map((item) => {
-            const Icon = item.icon;
-            const hasImage = images[item.key as keyof typeof images];
-            return (
-              <div key={item.key} className="border border-gray-200 rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${hasImage ? 'bg-green-100' : 'bg-gray-100'}`}>
-                    {hasImage ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <Icon className="w-5 h-5 text-gray-500" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-800">{item.label}</h3>
-                    <p className="text-sm text-gray-500">{item.desc}</p>
-                  </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <Store className="w-4 h-4" />
+              门头照片
+            </label>
+            <div className="relative">
+              {formData.storefrontImage ? (
+                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  <img src={formData.storefrontImage} alt="门头" className="w-full h-full object-cover" />
                 </div>
-                
-                {hasImage ? (
-                  <div className="relative">
-                    <img
-                      src={hasImage}
-                      alt={item.label}
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <button
-                      onClick={() => handleImageUploadClick(item.key as 'storefront' | 'checkout' | 'license')}
-                      className="absolute top-2 right-2 bg-white/90 p-2 rounded-full shadow-md hover:bg-white transition-colors"
-                    >
-                      <Camera className="w-4 h-4 text-gray-600" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleImageUploadClick(item.key as 'storefront' | 'checkout' | 'license')}
-                    className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-blue-400 transition-colors"
-                  >
-                    <Camera className="w-8 h-8 text-gray-400" />
-                    <span className="text-sm text-gray-500">点击拍照或上传</span>
-                  </button>
+              ) : (
+                <div className="aspect-video bg-gray-100 rounded-lg flex flex-col items-center justify-center">
+                  <Camera className="w-12 h-12 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">点击上传门头照片</p>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => handleImageUpload('storefrontImage', e)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <CreditCard className="w-4 h-4" />
+              收银台照片
+            </label>
+            <div className="relative">
+              {formData.checkoutImage ? (
+                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  <img src={formData.checkoutImage} alt="收银台" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="aspect-video bg-gray-100 rounded-lg flex flex-col items-center justify-center">
+                  <Camera className="w-12 h-12 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">点击上传收银台照片</p>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => handleImageUpload('checkoutImage', e)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <FileText className="w-4 h-4" />
+              营业执照照片
+            </label>
+            <div className="relative">
+              {formData.licenseImage ? (
+                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  <img src={formData.licenseImage} alt="营业执照" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="aspect-video bg-gray-100 rounded-lg flex flex-col items-center justify-center">
+                  <Camera className="w-12 h-12 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">点击上传营业执照照片</p>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => handleImageUpload('licenseImage', e)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <Monitor className="w-4 h-4" />
+              终端编号
+            </label>
+            <input
+              type="text"
+              value={formData.terminalNumber}
+              onChange={(e) => setFormData((prev) => ({ ...prev, terminalNumber: e.target.value }))}
+              placeholder="请输入终端编号"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            提交核验记录
+          </button>
+        </div>
+      </div>
+
+      {showHistory && verifications.length > 0 && (
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <h3 className="font-semibold text-gray-800 mb-4">历史核验记录 ({verifications.length})</h3>
+          <div className="space-y-3">
+            {verifications.map((v) => (
+              <div
+                key={v.id}
+                onClick={() => setSelectedVerification(v)}
+                className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-800">核验记录 #{v.id}</span>
+                  <span className="flex items-center gap-1 text-xs text-gray-500">
+                    <Calendar className="w-3 h-3" />
+                    {v.createdAt}
+                  </span>
+                </div>
+                {v.terminalNumber && (
+                  <p className="text-xs text-gray-500 mt-1">终端编号: {v.terminalNumber}</p>
                 )}
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Monitor className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h3 className="font-medium text-gray-800">终端编号</h3>
-            <p className="text-sm text-gray-500">扫描或输入终端编号</p>
+            ))}
           </div>
         </div>
-        
-        <input
-          type="text"
-          placeholder="请输入终端编号"
-          value={terminalNumber}
-          onChange={(e) => setTerminalNumber(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
+      )}
 
-      <button
-        onClick={handleSubmit}
-        disabled={verified}
-        className={`w-full py-4 rounded-xl font-medium transition-colors ${
-          verified
-            ? 'bg-green-500 text-white'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
-        }`}
-      >
-        {verified ? (
-          <span className="flex items-center justify-center gap-2">
-            <CheckCircle className="w-5 h-5" />
-            核验完成
-          </span>
-        ) : (
-          <span className="flex items-center justify-center gap-2">
-            <Upload className="w-5 h-5" />
-            提交核验信息
-          </span>
-        )}
-      </button>
+      {selectedVerification && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedVerification(null)} />
+          <div className="relative bg-white w-full sm:w-[480px] sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-hidden">
+            <div className="sticky top-0 bg-white border-b px-4 py-4 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">核验详情</h3>
+              <button onClick={() => setSelectedVerification(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[calc(80vh-60px)] p-4 space-y-4">
+              {selectedVerification.storefrontImage && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">门头照片</p>
+                  <img
+                    src={selectedVerification.storefrontImage}
+                    alt="门头"
+                    className="w-full aspect-video rounded-lg object-cover"
+                  />
+                </div>
+              )}
+              {selectedVerification.checkoutImage && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">收银台照片</p>
+                  <img
+                    src={selectedVerification.checkoutImage}
+                    alt="收银台"
+                    className="w-full aspect-video rounded-lg object-cover"
+                  />
+                </div>
+              )}
+              {selectedVerification.licenseImage && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">营业执照</p>
+                  <img
+                    src={selectedVerification.licenseImage}
+                    alt="营业执照"
+                    className="w-full aspect-video rounded-lg object-cover"
+                  />
+                </div>
+              )}
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-500">终端编号</p>
+                <p className="text-lg font-medium text-gray-800">{selectedVerification.terminalNumber || '未填写'}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-500">提交日期</p>
+                <p className="text-lg font-medium text-gray-800">{selectedVerification.createdAt}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,7 +32,7 @@ export const mockVerifications: Verification[] = [
 ];
 
 export const mockCommunications: Communication[] = [
-  { id: 1, merchantId: 1, notes: '商户表示近期经营状况良好，无异常情况', rectificationRequirements: '要求商户加强交易监控', commitmentDate: '2024-12-25', recorder: '张三', createdAt: '2024-12-10' },
+  { id: 1, merchantId: 1, notes: '商户表示近期经营状况良好，无异常情况', rectificationRequirements: '要求商户加强交易监控', commitmentDate: '2024-12-25', recorder: '张三', createdAt: '2024-12-10', followedUp: false },
 ];
 
 export const mockDisposals: Disposal[] = [
